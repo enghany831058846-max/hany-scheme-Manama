@@ -1,0 +1,6 @@
+{
+  "name": "ProjectFlow - Enterprise Project Tracking & Dispatch Dashboard",
+  "description": "Dynamic project tracking and supervisor dispatch dashboard powered by Turso libSQL, Drizzle ORM, and Excel SheetJS import with real-time analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
