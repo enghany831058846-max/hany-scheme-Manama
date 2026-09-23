@@ -1,35 +1,45 @@
 import { createClient } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
-import fs from 'fs';
 import * as schema from './schema.ts';
 
-// Extract and normalize Turso DB credentials (defensively handle swapped env vars)
-let rawUrl = process.env.TURSO_DATABASE_URL || 'file:local.db';
-let rawToken = process.env.TURSO_AUTH_TOKEN || undefined;
+function resolveTursoCredentials() {
+  let dbUrl = (process.env.TURSO_DATABASE_URL || '').trim();
+  let authToken = (process.env.TURSO_AUTH_TOKEN || '').trim() || undefined;
 
-let url = rawUrl;
-let authToken = rawToken;
+  // Auto-detect if TURSO_DATABASE_URL and TURSO_AUTH_TOKEN were swapped in environment configuration
+  const isUrlActuallyToken = dbUrl.startsWith('eyJ') || (dbUrl.length > 80 && !dbUrl.includes('://'));
+  const isTokenActuallyUrl = authToken && (authToken.startsWith('libsql://') || authToken.startsWith('https://') || authToken.startsWith('http://'));
 
-// Check if credentials were inadvertently swapped in the environment:
-// e.g. TURSO_DATABASE_URL has JWT ("eyJ...") and TURSO_AUTH_TOKEN has "libsql://..."
-if (url.startsWith('eyJ') && (authToken?.startsWith('libsql://') || authToken?.startsWith('https://') || authToken?.startsWith('http://'))) {
-  const temp = url;
-  url = authToken;
-  authToken = temp;
-} else if (!url.startsWith('libsql://') && !url.startsWith('https://') && !url.startsWith('http://') && !url.startsWith('file:') && authToken?.startsWith('libsql://')) {
-  const temp = url;
-  url = authToken;
-  authToken = temp;
+  if (isUrlActuallyToken && isTokenActuallyUrl) {
+    console.log('[Database] Detected swapped TURSO_DATABASE_URL and TURSO_AUTH_TOKEN. Automatically swapping them.');
+    const temp = dbUrl;
+    dbUrl = authToken!;
+    authToken = temp;
+  } else if (isUrlActuallyToken && !authToken) {
+    console.warn('[Database] TURSO_DATABASE_URL contains a JWT token instead of a database URL. Defaulting to file:local.db');
+    authToken = dbUrl;
+    dbUrl = 'file:local.db';
+  }
+
+  // Fallback to local SQLite if URL is empty or invalid
+  if (!dbUrl || (!dbUrl.startsWith('libsql://') && !dbUrl.startsWith('https://') && !dbUrl.startsWith('http://') && !dbUrl.startsWith('file:'))) {
+    console.warn(`[Database] Database URL "${dbUrl.slice(0, 20)}..." is not a valid protocol. Falling back to local file:local.db`);
+    dbUrl = 'file:local.db';
+  }
+
+  return { dbUrl, authToken };
 }
 
+const { dbUrl, authToken } = resolveTursoCredentials();
+
 export const client = createClient({
-  url,
+  url: dbUrl,
   authToken,
 });
 
 export const db = drizzle(client, { schema });
 
-// Ensure table exists on initialization and sync local records if needed
+// Ensure table exists on initialization
 export async function initDatabase() {
   try {
     await client.execute(`
@@ -66,40 +76,7 @@ export async function initDatabase() {
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log(`[Database] Initialized using: ${url.startsWith('file:') ? 'local SQLite (file:local.db)' : 'Turso libSQL Cloud'}`);
-
-    // If using remote Turso and it's empty, seamlessly migrate data from local.db if present
-    if (!url.startsWith('file:') && fs.existsSync('local.db')) {
-      const countRes = await client.execute('SELECT COUNT(*) as count FROM projects');
-      const count = Number(countRes.rows[0]?.count || 0);
-      if (count === 0) {
-        console.log('[Database] Remote Turso is empty. Migrating existing projects from local.db...');
-        try {
-          const localClient = createClient({ url: 'file:local.db' });
-          const localData = await localClient.execute('SELECT * FROM projects');
-          if (localData.rows.length > 0) {
-            // Batch in chunks of 50 for quick transmission
-            const chunkSize = 50;
-            for (let i = 0; i < localData.rows.length; i += chunkSize) {
-              const chunk = localData.rows.slice(i, i + chunkSize);
-              const statements = chunk.map((row) => {
-                const keys = Object.keys(row).filter((k) => k !== 'id');
-                const placeholders = keys.map(() => '?').join(', ');
-                const values = keys.map((k) => row[k]);
-                return {
-                  sql: `INSERT OR IGNORE INTO projects (${keys.join(', ')}) VALUES (${placeholders})`,
-                  args: values,
-                };
-              });
-              await client.batch(statements, 'write');
-            }
-            console.log(`[Database] Successfully migrated ${localData.rows.length} projects to remote Turso database!`);
-          }
-        } catch (migrationErr) {
-          console.error('[Database] Notice: Migration from local.db error:', migrationErr);
-        }
-      }
-    }
+    console.log(`[Database] Initialized using: ${dbUrl.startsWith('file:') ? 'local SQLite (file:local.db)' : `Turso Cloud (${dbUrl.split('.turso.io')[0]}.turso.io)`}`);
   } catch (err) {
     console.error('[Database] Error initializing table:', err);
   }
