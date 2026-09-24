@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, X, Calendar, Hash, ArrowUpDown, ChevronRight, Layers, Loader2 } from 'lucide-react';
+import { Search, X, Calendar, Hash, ArrowUpDown, ChevronRight, Layers, Loader2, Building2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog.tsx';
 import { Input } from './ui/input.tsx';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './ui/table.tsx';
@@ -26,7 +26,7 @@ export function ProjectsModal({
   onSelectProject,
 }: ProjectsModalProps) {
   const [filterText, setFilterText] = useState('');
-  const [sortField, setSortField] = useState<'job_id' | 'progress_percent' | 'end_date'>('job_id');
+  const [sortField, setSortField] = useState<'job_id' | 'progress_percent' | 'end_date' | 'contractor'>('job_id');
   const [sortAsc, setSortAsc] = useState(true);
 
   // Filter projects by text inside modal
@@ -38,6 +38,8 @@ export function ProjectsModal({
         (p) =>
           p.job_id.toLowerCase().includes(q) ||
           (p.job_type && p.job_type.toLowerCase().includes(q)) ||
+          (p.contractor && p.contractor.toLowerCase().includes(q)) ||
+          (p.zone && p.zone.toLowerCase().includes(q)) ||
           (p.substation_name && p.substation_name.toLowerCase().includes(q)) ||
           (p.po_number && p.po_number.toLowerCase().includes(q))
       );
@@ -54,7 +56,7 @@ export function ProjectsModal({
     });
   }, [projects, filterText, sortField, sortAsc]);
 
-  const handleSort = (field: 'job_id' | 'progress_percent' | 'end_date') => {
+  const handleSort = (field: 'job_id' | 'progress_percent' | 'end_date' | 'contractor') => {
     if (sortField === field) {
       setSortAsc(!sortAsc);
     } else {
@@ -67,7 +69,7 @@ export function ProjectsModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent maxWidth="max-w-5xl" onClose={onClose} className="p-6">
+      <DialogContent maxWidth="max-w-6xl" onClose={onClose} className="p-6">
         <DialogHeader className="border-b border-slate-100 pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
@@ -111,7 +113,7 @@ export function ProjectsModal({
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
               disabled={isLoading}
-              placeholder={isLoading ? 'Loading records...' : 'Filter by Job ID, Type, Substation, or PO Number...'}
+              placeholder={isLoading ? 'Loading records...' : 'Filter by Job ID, Contractor, Type, Substation, Zone, or PO...'}
               className="pl-10 pr-9 py-2 h-9 text-xs rounded-lg disabled:opacity-50"
             />
             {filterText && !isLoading && (
@@ -136,8 +138,9 @@ export function ProjectsModal({
                   <TableHead className="text-xs">Job Type</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
                   <TableHead className="text-xs">Progress</TableHead>
-                  <TableHead className="text-xs">End Date</TableHead>
+                  <TableHead className="text-xs">Contractor</TableHead>
                   <TableHead className="text-xs">Substation / Zone</TableHead>
+                  <TableHead className="text-xs">End Date</TableHead>
                   <TableHead className="text-right text-xs">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -148,7 +151,7 @@ export function ProjectsModal({
                       <div className="h-4 bg-slate-200/80 rounded w-28" />
                     </TableCell>
                     <TableCell className="py-3.5">
-                      <div className="h-4 bg-slate-200/80 rounded w-32" />
+                      <div className="h-4 bg-slate-200/80 rounded w-24" />
                     </TableCell>
                     <TableCell className="py-3.5">
                       <div className="h-5 bg-slate-200/80 rounded-full w-20" />
@@ -160,13 +163,16 @@ export function ProjectsModal({
                       </div>
                     </TableCell>
                     <TableCell className="py-3.5">
-                      <div className="h-4 bg-slate-200/80 rounded w-20" />
+                      <div className="h-4 bg-slate-200/80 rounded w-28" />
                     </TableCell>
                     <TableCell className="py-3.5">
                       <div className="space-y-1">
                         <div className="h-4 bg-slate-200/80 rounded w-36" />
                         <div className="h-2.5 bg-slate-100 rounded w-20" />
                       </div>
+                    </TableCell>
+                    <TableCell className="py-3.5">
+                      <div className="h-4 bg-slate-200/80 rounded w-20" />
                     </TableCell>
                     <TableCell className="text-right py-3.5">
                       <div className="h-6 bg-slate-200/80 rounded w-12 ml-auto" />
@@ -206,6 +212,16 @@ export function ProjectsModal({
                     </div>
                   </TableHead>
                   <TableHead
+                    onClick={() => handleSort('contractor')}
+                    className="cursor-pointer hover:text-slate-900 select-none text-xs"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Contractor</span>
+                      <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-xs">Substation & Zone</TableHead>
+                  <TableHead
                     onClick={() => handleSort('end_date')}
                     className="cursor-pointer hover:text-slate-900 select-none text-xs"
                   >
@@ -214,7 +230,6 @@ export function ProjectsModal({
                       <ArrowUpDown className="h-3 w-3 text-slate-400" />
                     </div>
                   </TableHead>
-                  <TableHead className="text-xs">Substation / Zone</TableHead>
                   <TableHead className="text-right text-xs">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -237,7 +252,7 @@ export function ProjectsModal({
                         </div>
                       </TableCell>
 
-                      <TableCell className="text-xs text-slate-700 font-medium py-3 max-w-[160px] truncate" title={p.job_type || ''}>
+                      <TableCell className="text-xs text-slate-700 font-medium py-3 max-w-[130px] truncate" title={p.job_type || ''}>
                         {p.job_type || '-'}
                       </TableCell>
 
@@ -271,22 +286,31 @@ export function ProjectsModal({
                         </div>
                       </TableCell>
 
+                      {/* Contractor column */}
+                      <TableCell className="text-xs text-slate-700 py-3 max-w-[160px] truncate" title={p.contractor || ''}>
+                        <div className="flex items-center gap-1.5 truncate">
+                          <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate font-medium">{p.contractor || '-'}</span>
+                        </div>
+                      </TableCell>
+
+                      {/* Substation & Zone column */}
+                      <TableCell className="text-xs text-slate-600 py-3 max-w-[180px] truncate" title={p.substation_name || ''}>
+                        <div className="font-semibold text-slate-800 truncate">
+                          {p.substation_name || '-'}
+                        </div>
+                        {p.zone ? (
+                          <div className="text-[10px] text-indigo-700 font-medium truncate mt-0.5">
+                            {p.zone} {p.block ? `• Blk ${p.block}` : ''}
+                          </div>
+                        ) : null}
+                      </TableCell>
+
                       <TableCell className="text-xs text-slate-600 font-mono py-3">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 text-slate-400" />
                           <span>{p.end_date || '-'}</span>
                         </div>
-                      </TableCell>
-
-                      <TableCell className="text-xs text-slate-600 py-3 max-w-[180px] truncate" title={p.substation_name || ''}>
-                        <div className="font-medium text-slate-800 truncate">
-                          {p.substation_name || '-'}
-                        </div>
-                        {p.zone && (
-                          <div className="text-[10px] text-slate-400">
-                            {p.zone} {p.block ? `(${p.block})` : ''}
-                          </div>
-                        )}
                       </TableCell>
 
                       <TableCell className="text-right py-3">

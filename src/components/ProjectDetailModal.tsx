@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Save, X, Hash, Briefcase, Calendar, MapPin, Building2, DollarSign, Clock, CheckCircle2, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog.tsx';
 import { Button } from './ui/button.tsx';
@@ -27,6 +27,29 @@ export function ProjectDetailModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState(false);
+  const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
+  const [isLoadingStatuses, setIsLoadingStatuses] = useState(false);
+
+  // Fetch distinct statuses dynamically whenever modal opens
+  useEffect(() => {
+    if (open) {
+      const fetchStatuses = async () => {
+        try {
+          setIsLoadingStatuses(true);
+          const res = await fetch('/api/statuses');
+          const data = await res.json();
+          if (res.ok && data.success && Array.isArray(data.statuses)) {
+            setAvailableStatuses(data.statuses);
+          }
+        } catch (err) {
+          console.error('Failed to load dynamic statuses from /api/statuses:', err);
+        } finally {
+          setIsLoadingStatuses(false);
+        }
+      };
+      fetchStatuses();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (project) {
@@ -36,6 +59,15 @@ export function ProjectDetailModal({
       setShowDeleteConfirm(false);
     }
   }, [project]);
+
+  // Ensure current project's status is always pre-selected & included in options
+  const statusOptions = useMemo(() => {
+    const list = [...availableStatuses];
+    if (formData.status && !list.includes(formData.status)) {
+      list.push(formData.status);
+    }
+    return list.sort((a, b) => a.localeCompare(b));
+  }, [availableStatuses, formData.status]);
 
   if (!project) return null;
 
@@ -196,17 +228,32 @@ export function ProjectDetailModal({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Status (Dynamic) *
-                </label>
-                <Input
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-700">
+                    Status *
+                  </label>
+                  {isLoadingStatuses && (
+                    <span className="text-[10px] text-slate-400">Loading options...</span>
+                  )}
+                </div>
+                <select
                   value={formData.status || ''}
                   onChange={(e) => handleChange('status', e.target.value)}
                   dir={isArabicOrRtl(formData.status) ? 'rtl' : 'ltr'}
                   required
-                  placeholder="e.g. قيد التنفيذ or In Progress"
-                  className="text-xs font-medium"
-                />
+                  className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 cursor-pointer"
+                >
+                  {!formData.status && (
+                    <option value="" disabled>
+                      Select status...
+                    </option>
+                  )}
+                  {statusOptions.map((st) => (
+                    <option key={st} value={st} dir={isArabicOrRtl(st) ? 'rtl' : 'ltr'}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

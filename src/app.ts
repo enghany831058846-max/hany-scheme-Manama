@@ -68,6 +68,30 @@ apiRouter.get('/health', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/statuses
+ * Returns distinct status values currently existing across all projects in the database.
+ * Used for dynamic status dropdowns in project edit forms.
+ */
+apiRouter.get('/statuses', async (req: Request, res: Response) => {
+  try {
+    const results = await db
+      .select({ status: projects.status })
+      .from(projects)
+      .groupBy(projects.status)
+      .orderBy(projects.status);
+
+    const statuses = results
+      .map((r) => r.status)
+      .filter((s): s is string => Boolean(s && s.trim()));
+
+    return res.json({ success: true, count: statuses.length, statuses });
+  } catch (err: any) {
+    console.error('Error fetching distinct statuses:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /api/dashboard/summary
  * Returns aggregated { supervisor, status, count }[] computed live from Turso DB.
  * Also returns overall metric highlights.
