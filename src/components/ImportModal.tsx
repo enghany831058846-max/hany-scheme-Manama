@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Upload,
   FileSpreadsheet,
@@ -9,6 +9,7 @@ import {
   Info,
   XCircle,
   Download,
+  X,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog.tsx';
 import { Button } from './ui/button.tsx';
@@ -28,10 +29,24 @@ export function ImportModal({ open, onClose, onImportComplete }: ImportModalProp
   const [resultSummary, setResultSummary] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Reset modal state whenever it opens to guarantee a clean slate
+  useEffect(() => {
+    if (open) {
+      setSelectedFile(null);
+      setErrorMsg(null);
+      setResultSummary(null);
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [open]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const ext = file.name.split('.').pop()?.toLowerCase();
+      const nameParts = file.name.split('.');
+      const ext = nameParts.length > 1 ? nameParts[nameParts.length - 1].toLowerCase() : '';
       if (ext !== 'xlsx' && ext !== 'xls') {
         setErrorMsg('Please select a valid Excel file (.xlsx or .xls)');
         setSelectedFile(null);
@@ -47,7 +62,8 @@ export function ImportModal({ open, onClose, onImportComplete }: ImportModalProp
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      const ext = file.name.split('.').pop()?.toLowerCase();
+      const nameParts = file.name.split('.');
+      const ext = nameParts.length > 1 ? nameParts[nameParts.length - 1].toLowerCase() : '';
       if (ext !== 'xlsx' && ext !== 'xls') {
         setErrorMsg('Please drop a valid Excel file (.xlsx or .xls)');
         return;
@@ -69,7 +85,7 @@ export function ImportModal({ open, onClose, onImportComplete }: ImportModalProp
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
         reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (err) => reject(err);
+        reader.onerror = () => reject(new Error('Failed to read Excel file on device.'));
       });
       reader.readAsDataURL(selectedFile);
       const fileBase64 = await base64Promise;
@@ -83,16 +99,33 @@ export function ImportModal({ open, onClose, onImportComplete }: ImportModalProp
         }),
       });
 
-      const data = await res.json();
+      // Defensive response parsing: avoid direct res.json() to prevent Safari WebKit
+      // DOMException 12 ("The string did not match the expected pattern") if the response is HTML/text
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        throw new Error(
+          `Server returned an invalid response (HTTP ${res.status}: ${res.statusText || 'Bad Response'}).`
+        );
+      }
+
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to process Excel import');
+        throw new Error(data.error || `Import failed with HTTP status ${res.status}`);
       }
 
       setResultSummary(data.summary);
       onImportComplete(data.summary);
     } catch (err: any) {
       console.error('Import error:', err);
-      setErrorMsg(err.message || 'Error uploading and processing file');
+      // Clean up generic WebKit pattern errors into friendly readable message
+      const msg = err?.message || 'Error uploading and processing file';
+      if (msg.includes('string did not match the expected pattern')) {
+        setErrorMsg('The server returned an unparseable response. Please verify the Excel format and try again.');
+      } else {
+        setErrorMsg(msg);
+      }
     } finally {
       setIsUploading(false);
     }
@@ -108,6 +141,7 @@ export function ImportModal({ open, onClose, onImportComplete }: ImportModalProp
   const downloadSampleTemplate = async () => {
     try {
       const res = await fetch('/api/sample-excel');
+      if (!res.ok) throw new Error('Failed to download template');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -117,8 +151,9 @@ export function ImportModal({ open, onClose, onImportComplete }: ImportModalProp
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error('Sample download error:', e);
+      setErrorMsg('Could not download sample template: ' + (e.message || 'Network error'));
     }
   };
 
@@ -142,9 +177,19 @@ export function ImportModal({ open, onClose, onImportComplete }: ImportModalProp
         </DialogHeader>
 
         {errorMsg && (
-          <div className="bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-xs mb-3 flex items-start gap-2">
-            <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
-            <span>{errorMsg}</span>
+          <div className="bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-xs mb-3 flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2">
+              <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{errorMsg}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setErrorMsg(null)}
+              className="text-red-400 hover:text-red-700 cursor-pointer p-0.5 rounded"
+              title="Dismiss error"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
 
@@ -155,7 +200,7 @@ export function ImportModal({ open, onClose, onImportComplete }: ImportModalProp
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors relative ${
                 selectedFile
                   ? 'border-indigo-400 bg-indigo-50/30'
                   : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50'
@@ -164,9 +209,11 @@ export function ImportModal({ open, onClose, onImportComplete }: ImportModalProp
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
                 onChange={handleFileChange}
                 className="hidden"
+                tabIndex={-1}
+                aria-hidden="true"
               />
 
               <div className="h-12 w-12 rounded-full bg-slate-100 text-indigo-600 mx-auto flex items-center justify-center mb-3">
