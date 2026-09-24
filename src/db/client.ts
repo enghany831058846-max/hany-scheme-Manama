@@ -102,6 +102,9 @@ export function initDatabase(): Promise<void> {
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
           );
         `);
+        await client.execute(`CREATE INDEX IF NOT EXISTS idx_projects_supervisor_status ON projects(supervisor, status);`);
+        await client.execute(`CREATE INDEX IF NOT EXISTS idx_projects_supervisor ON projects(supervisor);`);
+        await client.execute(`CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);`);
         console.log(`[Database] Initialized using: ${dbUrl.startsWith('file:') ? 'local SQLite (file:local.db)' : `Turso Cloud (${dbUrl.split('.turso.io')[0]}.turso.io)`}`);
       } catch (err) {
         console.error('[Database] Error initializing table:', err);

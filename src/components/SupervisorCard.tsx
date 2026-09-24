@@ -1,4 +1,4 @@
-import { Users, ChevronRight, Briefcase, Filter } from 'lucide-react';
+import { Users, ChevronRight, Briefcase, Filter, Loader2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card.tsx';
 import { getStatusColor, isArabicOrRtl } from '../lib/utils.ts';
 
@@ -15,6 +15,7 @@ export interface SupervisorData {
 interface SupervisorCardProps {
   data: SupervisorData;
   activeStatusFilter?: string;
+  loadingTarget?: { supervisor: string; status: string | null } | null;
   onSelectStatus: (supervisor: string, status: string) => void;
   onViewAllSupervisorProjects: (supervisor: string) => void;
 }
@@ -22,12 +23,14 @@ interface SupervisorCardProps {
 export function SupervisorCard({
   data,
   activeStatusFilter,
+  loadingTarget,
   onSelectStatus,
   onViewAllSupervisorProjects,
 }: SupervisorCardProps) {
   // Check if supervisor name is Arabic
   const isSupervisorRTL = isArabicOrRtl(data.supervisor);
   const isFiltered = Boolean(activeStatusFilter);
+  const isAllLoading = loadingTarget?.supervisor === data.supervisor && loadingTarget?.status === null;
 
   return (
     <Card className={`transition-all duration-200 border-slate-200/90 flex flex-col justify-between overflow-hidden shadow-xs hover:shadow-md ${
@@ -59,9 +62,12 @@ export function SupervisorCard({
             <button
               type="button"
               onClick={() => onViewAllSupervisorProjects(data.supervisor)}
-              className="flex items-center gap-1 rounded-full bg-slate-900 text-white px-2.5 py-1 text-xs font-bold shrink-0 cursor-pointer hover:bg-indigo-600 transition-colors shadow-xs"
+              className="flex items-center gap-1.5 rounded-full bg-slate-900 text-white px-2.5 py-1 text-xs font-bold shrink-0 cursor-pointer hover:bg-indigo-600 transition-colors shadow-xs active:scale-95"
               title={`View all projects for ${data.supervisor}`}
             >
+              {isAllLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin text-white" />
+              ) : null}
               <span>{data.total}</span>
               <span className="text-[10px] font-normal opacity-85">
                 {isFiltered ? 'matching' : 'projects'}
@@ -106,6 +112,7 @@ export function SupervisorCard({
               const isStatusRTL = isArabicOrRtl(item.status);
               const totalToCompare = isFiltered && data.totalAllStatuses ? data.totalAllStatuses : data.total;
               const percentage = totalToCompare > 0 ? Math.round((item.count / totalToCompare) * 100) : 100;
+              const isRowLoading = loadingTarget?.supervisor === data.supervisor && loadingTarget?.status === item.status;
 
               return (
                 <button
@@ -113,7 +120,9 @@ export function SupervisorCard({
                   type="button"
                   onClick={() => onSelectStatus(data.supervisor, item.status)}
                   title={`Click to view ${item.count} projects for ${data.supervisor} with status "${item.status}"`}
-                  className={`w-full group flex items-center justify-between p-2.5 rounded-lg border text-xs font-medium transition-all duration-150 cursor-pointer ${colors.bg} ${colors.border} hover:shadow-xs hover:border-indigo-400 hover:ring-1 hover:ring-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-left`}
+                  className={`w-full group flex items-center justify-between p-2.5 rounded-lg border text-xs font-medium transition-all duration-150 cursor-pointer ${colors.bg} ${colors.border} hover:shadow-xs hover:border-indigo-400 hover:ring-1 hover:ring-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-left active:scale-[0.99] ${
+                    isRowLoading ? 'ring-2 ring-indigo-500 shadow-xs' : ''
+                  }`}
                 >
                   {/* Left: Status Name + Dot */}
                   <div className="flex items-center gap-2 min-w-0 flex-1 py-0.5">
@@ -126,7 +135,7 @@ export function SupervisorCard({
                     </span>
                   </div>
 
-                  {/* Right: Percentage + Count Badge + Chevron */}
+                  {/* Right: Percentage + Count Badge + Chevron / Spinner */}
                   <div className="flex items-center gap-2 shrink-0 ml-2">
                     <span className="text-[10px] text-slate-400 font-mono">
                       {percentage}%
@@ -138,7 +147,11 @@ export function SupervisorCard({
                       {item.count}
                     </span>
 
-                    <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors shrink-0" />
+                    {isRowLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600 shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors shrink-0" />
+                    )}
                   </div>
                 </button>
               );
@@ -148,22 +161,17 @@ export function SupervisorCard({
 
         {/* Card Footer */}
         <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-          <span className="text-slate-400 text-[11px]">
-            {isFiltered ? (
-              <span className="font-medium text-indigo-700">1 status shown</span>
-            ) : (
-              <span>{data.statuses.length} distinct status{data.statuses.length > 1 ? 'es' : ''}</span>
-            )}
-          </span>
-
           <button
             type="button"
             onClick={() => onViewAllSupervisorProjects(data.supervisor)}
-            className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors flex items-center gap-1 cursor-pointer"
+            className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1 cursor-pointer"
           >
-            <span>All Projects</span>
+            <span>View All Supervisor Records</span>
             <ChevronRight className="h-3 w-3" />
           </button>
+          <span className="text-[10px] text-slate-400 font-mono">
+            {data.statuses.length} {data.statuses.length === 1 ? 'stage' : 'stages'}
+          </span>
         </div>
       </CardContent>
     </Card>
