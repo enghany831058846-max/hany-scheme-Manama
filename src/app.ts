@@ -249,9 +249,7 @@ apiRouter.get('/projects', async (req: Request, res: Response) => {
           like(projects.supervisor, q),
           like(projects.status, q),
           like(projects.substation_name, q),
-          like(projects.contractor, q),
-          like(projects.zone, q),
-          like(projects.block, q)
+          like(projects.contractor, q)
         )
       );
     }
