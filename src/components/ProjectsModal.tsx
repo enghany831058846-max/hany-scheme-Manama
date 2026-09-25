@@ -314,12 +314,17 @@ export function ProjectsModal({
                             <div
                               className={`h-1.5 rounded-full transition-all duration-300 ${
                                 progress >= 100
-                                  ? 'bg-emerald-500'
+                                  ? 'bg-emerald-500 w-full'
+                                  : progress >= 75
+                                  ? 'bg-indigo-600 w-3/4'
                                   : progress >= 50
-                                  ? 'bg-indigo-600'
-                                  : 'bg-amber-500'
+                                  ? 'bg-indigo-600 w-1/2'
+                                  : progress >= 25
+                                  ? 'bg-amber-500 w-1/4'
+                                  : progress > 0
+                                  ? 'bg-amber-500 w-[10%]'
+                                  : 'w-0'
                               }`}
-                              style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
                             />
                           </div>
                         </div>

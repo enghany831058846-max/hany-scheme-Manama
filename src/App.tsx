@@ -27,6 +27,7 @@ import {
   X,
 } from 'lucide-react';
 import { getStatusColor, isArabicOrRtl } from './lib/utils.ts';
+import { buildApiUrl, safeFetchJson, fetchWithRetry } from './lib/api.ts';
 import type { Project } from './db/schema.ts';
 import type { ImportResult } from './lib/excelMapping.ts';
 
@@ -96,12 +97,13 @@ export default function App() {
     try {
       if (!isRefresh) setIsLoading(true);
       setError(null);
-      const res = await fetch('/api/dashboard/summary');
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to fetch dashboard data');
-      }
+      const data = await fetchWithRetry<{
+        success: boolean;
+        supervisors: SupervisorData[];
+        projectsIndex: ProjectSearchItem[];
+        stats: any;
+        error?: string;
+      }>('/api/dashboard/summary', undefined, 3, 500);
 
       setSupervisors(data.supervisors || []);
       setProjectIndex(data.projectsIndex || []);
@@ -120,8 +122,9 @@ export default function App() {
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message);
-      toast.error('Error connecting to Turso: ' + err.message);
+      const errorText = err?.message || 'Error connecting to database';
+      setError(errorText);
+      toast.error('Error connecting to Turso: ' + errorText);
     } finally {
       setIsLoading(false);
     }
@@ -289,14 +292,9 @@ export default function App() {
 
       // Revalidate in background silently (SWR)
       try {
-        const url = new URL('/api/projects', window.location.origin);
-        url.searchParams.set('supervisor', supervisor);
-        if (status) {
-          url.searchParams.set('status', status);
-        }
-        const res = await fetch(url.toString());
-        const data = await res.json();
-        if (res.ok && data.success && Array.isArray(data.projects)) {
+        const targetUrl = buildApiUrl('/api/projects', { supervisor, status });
+        const data = await safeFetchJson<{ success: boolean; projects: Project[] }>(targetUrl);
+        if (data.success && Array.isArray(data.projects)) {
           projectsCache.current.set(cacheKey, data.projects);
           setModalProjects(data.projects);
         }
@@ -316,23 +314,14 @@ export default function App() {
     });
 
     try {
-      const url = new URL('/api/projects', window.location.origin);
-      url.searchParams.set('supervisor', supervisor);
-      if (status) {
-        url.searchParams.set('status', status);
-      }
-
-      const res = await fetch(url.toString());
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to fetch projects');
-      }
+      const targetUrl = buildApiUrl('/api/projects', { supervisor, status });
+      const data = await safeFetchJson<{ success: boolean; projects: Project[] }>(targetUrl);
       const fetched = data.projects || [];
       projectsCache.current.set(cacheKey, fetched);
       setModalProjects(fetched);
     } catch (err: any) {
       console.error(err);
-      toast.error('Failed to load projects list');
+      toast.error('Failed to load projects list: ' + (err?.message || 'Network error'));
     } finally {
       setIsModalProjectsLoading(false);
       setLoadingTarget(null);
@@ -378,8 +367,10 @@ export default function App() {
   const handleConfirmSeedData = async () => {
     try {
       setIsSeeding(true);
-      const res = await fetch('/api/seed', { method: 'POST' });
-      const data = await res.json();
+      const data = await safeFetchJson<{ success: boolean; seededCount?: number; error?: string }>(
+        '/api/seed',
+        { method: 'POST' }
+      );
       if (data.success) {
         projectsCache.current.clear();
         toast.success(`Successfully seeded ${data.seededCount} demo projects!`);
@@ -389,7 +380,7 @@ export default function App() {
         toast.error('Failed to seed: ' + (data.error || 'Unknown error'));
       }
     } catch (err: any) {
-      toast.error('Failed to seed data: ' + err.message);
+      toast.error('Failed to seed data: ' + (err?.message || 'Network error'));
     } finally {
       setIsSeeding(false);
     }

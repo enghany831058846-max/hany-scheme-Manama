@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from './ui/button.tsx';
 import { Input } from './ui/input.tsx';
 import { getStatusColor, isArabicOrRtl } from '../lib/utils.ts';
+import { safeFetchJson } from '../lib/api.ts';
 import type { Project } from '../db/schema.ts';
 
 interface ProjectDetailModalProps {
@@ -36,9 +37,8 @@ export function ProjectDetailModal({
       const fetchStatuses = async () => {
         try {
           setIsLoadingStatuses(true);
-          const res = await fetch('/api/statuses');
-          const data = await res.json();
-          if (res.ok && data.success && Array.isArray(data.statuses)) {
+          const data = await safeFetchJson<{ success: boolean; statuses?: string[] }>('/api/statuses');
+          if (data && data.success && Array.isArray(data.statuses)) {
             setAvailableStatuses(data.statuses);
           }
         } catch (err) {
@@ -105,16 +105,14 @@ export function ProjectDetailModal({
         payload.total_cost_audited = parseFloat(String(payload.total_cost_audited)) || 0;
       }
 
-      const res = await fetch(`/api/projects/${project.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to update project in Turso database.');
-      }
+      const data = await safeFetchJson<{ success: boolean; project: Project; error?: string }>(
+        `/api/projects/${project.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
 
       setSuccessMsg(true);
       setTimeout(() => {
@@ -133,13 +131,9 @@ export function ProjectDetailModal({
     try {
       setIsDeleting(true);
       setErrorMsg(null);
-      const res = await fetch(`/api/projects/${project.id}`, {
+      await safeFetchJson(`/api/projects/${project.id}`, {
         method: 'DELETE',
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to delete project');
-      }
       if (onDeleteSuccess) {
         onDeleteSuccess(project.id);
       }
