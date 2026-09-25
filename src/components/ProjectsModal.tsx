@@ -1,8 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, X, Hash, ArrowUpDown, ChevronRight, Layers, Loader2, Building2, MapPin } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog.tsx';
 import { Input } from './ui/input.tsx';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './ui/table.tsx';
 import { getStatusColor, isArabicOrRtl } from '../lib/utils.ts';
 import type { Project } from '../db/schema.ts';
 
@@ -14,6 +13,7 @@ interface ProjectsModalProps {
   projects: Project[];
   isLoading: boolean;
   onSelectProject: (project: Project) => void;
+  initialFilter?: string;
 }
 
 type SortField = 'job_id' | 'job_type' | 'status' | 'progress_percent' | 'contractor' | 'block';
@@ -26,10 +26,18 @@ export function ProjectsModal({
   projects,
   isLoading,
   onSelectProject,
+  initialFilter = '',
 }: ProjectsModalProps) {
-  const [filterText, setFilterText] = useState('');
+  const [filterText, setFilterText] = useState(initialFilter);
   const [sortField, setSortField] = useState<SortField>('job_id');
   const [sortAsc, setSortAsc] = useState(true);
+
+  // Initialize or synchronize filter when modal opens
+  useEffect(() => {
+    if (open) {
+      setFilterText(initialFilter);
+    }
+  }, [open, initialFilter]);
 
   // Filter projects by text inside modal
   const filteredProjects = useMemo(() => {
@@ -138,155 +146,155 @@ export function ProjectsModal({
           </div>
         </DialogHeader>
 
-        {/* Clean bordered table container */}
-        <div className="overflow-x-auto overflow-y-auto max-h-[62vh] rounded-xl border border-slate-200 shadow-xs my-3 bg-white ring-1 ring-slate-900/5">
+        {/* Table Container - styled with a clean bordered card enclosure and subtle background tint */}
+        <div className="overflow-x-auto overflow-y-auto max-h-[62vh] rounded-xl border border-slate-200/90 shadow-xs my-3 bg-slate-100/50 p-2.5 ring-1 ring-slate-900/5">
           {isLoading ? (
             /* Instant Skeleton Table when loading */
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-100/90 border-b border-slate-200">
-                  <TableHead className="py-3 px-4 text-xs font-semibold text-slate-700 align-middle">Job ID</TableHead>
-                  <TableHead className="py-3 px-4 text-xs font-semibold text-slate-700 align-middle">Job Type</TableHead>
-                  <TableHead className="py-3 px-4 text-xs font-semibold text-slate-700 align-middle">Status</TableHead>
-                  <TableHead className="py-3 px-4 text-xs font-semibold text-slate-700 align-middle">Progress</TableHead>
-                  <TableHead className="py-3 px-4 text-xs font-semibold text-slate-700 min-w-[240px] align-middle">Contractor</TableHead>
-                  <TableHead className="py-3 px-4 text-xs font-semibold text-slate-700 min-w-[170px] align-middle">Block</TableHead>
-                  <TableHead className="py-3 px-4 text-right text-xs font-semibold text-slate-700 align-middle">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <table className="w-full border-separate border-spacing-x-0 border-spacing-y-2 text-left">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-none">
+                  <th className="py-3.5 px-4 text-xs font-bold text-slate-700 align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">Job ID</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-slate-700 align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">Job Type</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-slate-700 align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">Status</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-slate-700 align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">Progress</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-slate-700 min-w-[240px] align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">Contractor</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-slate-700 min-w-[170px] align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">Block</th>
+                  <th className="py-3.5 px-4 text-right text-xs font-bold text-slate-700 align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">Action</th>
+                </tr>
+              </thead>
+              <tbody>
                 {[1, 2, 3, 4, 5, 6].map((idx) => (
-                  <TableRow key={idx} className="animate-pulse border-b border-slate-100 odd:bg-white even:bg-slate-50/60">
-                    <TableCell className="py-3.5 px-4 align-middle">
+                  <tr key={idx} className="animate-pulse">
+                    <td className="py-4 px-4 align-middle bg-slate-50/95 border-y border-slate-200/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">
                       <div className="h-4 bg-slate-200/80 rounded w-28" />
-                    </TableCell>
-                    <TableCell className="py-3.5 px-4 align-middle">
+                    </td>
+                    <td className="py-4 px-4 align-middle bg-slate-50/95 border-y border-slate-200/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">
                       <div className="h-4 bg-slate-200/80 rounded w-20" />
-                    </TableCell>
-                    <TableCell className="py-3.5 px-4 align-middle">
+                    </td>
+                    <td className="py-4 px-4 align-middle bg-slate-50/95 border-y border-slate-200/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">
                       <div className="h-5 bg-slate-200/80 rounded-full w-20" />
-                    </TableCell>
-                    <TableCell className="py-3.5 px-4 align-middle">
+                    </td>
+                    <td className="py-4 px-4 align-middle bg-slate-50/95 border-y border-slate-200/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">
                       <div className="w-24 space-y-1.5">
                         <div className="h-2 bg-slate-200/80 rounded-full w-full" />
                         <div className="h-2 bg-slate-200/80 rounded w-8" />
                       </div>
-                    </TableCell>
-                    <TableCell className="py-3.5 px-4 min-w-[240px] align-middle">
+                    </td>
+                    <td className="py-4 px-4 min-w-[240px] align-middle bg-slate-50/95 border-y border-slate-200/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">
                       <div className="h-4 bg-slate-200/80 rounded w-52" />
-                    </TableCell>
-                    <TableCell className="py-3.5 px-4 min-w-[170px] align-middle">
+                    </td>
+                    <td className="py-4 px-4 min-w-[170px] align-middle bg-slate-50/95 border-y border-slate-200/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">
                       <div className="h-5 bg-slate-200/80 rounded-full w-28" />
-                    </TableCell>
-                    <TableCell className="text-right py-3.5 px-4 align-middle">
+                    </td>
+                    <td className="text-right py-4 px-4 align-middle bg-slate-50/95 border-y border-slate-200/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs">
                       <div className="h-6 bg-slate-200/80 rounded-md w-12 ml-auto" />
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           ) : filteredProjects.length === 0 ? (
-            <div className="py-16 text-center text-slate-400">
+            <div className="py-16 text-center text-slate-400 bg-white rounded-lg border border-slate-200/80 m-2">
               <Layers className="h-10 w-10 mx-auto text-slate-300 mb-2" />
               <p className="text-sm font-semibold text-slate-600">No projects found</p>
               <p className="text-xs text-slate-400 mt-1">Try clearing filters or search query.</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-100/90 border-b border-slate-200 sticky top-0 z-10 backdrop-blur-xs shadow-2xs">
-                  <TableHead
+            <table className="w-full border-separate border-spacing-x-0 border-spacing-y-2 text-left">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-none">
+                  <th
                     onClick={() => handleSort('job_id')}
-                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-semibold text-slate-700 py-3 px-4 w-[160px] align-middle"
+                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-bold text-slate-700 py-3.5 px-4 w-[160px] align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl backdrop-blur-xs shadow-2xs transition-colors"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Job ID</span>
                       <ArrowUpDown className={`h-3 w-3 ${sortField === 'job_id' ? 'text-indigo-600' : 'text-slate-400'}`} />
                     </div>
-                  </TableHead>
+                  </th>
 
-                  <TableHead
+                  <th
                     onClick={() => handleSort('job_type')}
-                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-semibold text-slate-700 py-3 px-4 w-[130px] align-middle"
+                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-bold text-slate-700 py-3.5 px-4 w-[130px] align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl backdrop-blur-xs shadow-2xs transition-colors"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Job Type</span>
                       <ArrowUpDown className={`h-3 w-3 ${sortField === 'job_type' ? 'text-indigo-600' : 'text-slate-400'}`} />
                     </div>
-                  </TableHead>
+                  </th>
 
-                  <TableHead
+                  <th
                     onClick={() => handleSort('status')}
-                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-semibold text-slate-700 py-3 px-4 w-[130px] align-middle"
+                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-bold text-slate-700 py-3.5 px-4 w-[130px] align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl backdrop-blur-xs shadow-2xs transition-colors"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Status</span>
                       <ArrowUpDown className={`h-3 w-3 ${sortField === 'status' ? 'text-indigo-600' : 'text-slate-400'}`} />
                     </div>
-                  </TableHead>
+                  </th>
 
-                  <TableHead
+                  <th
                     onClick={() => handleSort('progress_percent')}
-                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-semibold text-slate-700 py-3 px-4 w-[130px] align-middle"
+                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-bold text-slate-700 py-3.5 px-4 w-[130px] align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl backdrop-blur-xs shadow-2xs transition-colors"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Progress</span>
                       <ArrowUpDown className={`h-3 w-3 ${sortField === 'progress_percent' ? 'text-indigo-600' : 'text-slate-400'}`} />
                     </div>
-                  </TableHead>
+                  </th>
 
-                  <TableHead
+                  <th
                     onClick={() => handleSort('contractor')}
-                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-semibold text-slate-700 py-3 px-4 min-w-[260px] align-middle"
+                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-bold text-slate-700 py-3.5 px-4 min-w-[260px] align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl backdrop-blur-xs shadow-2xs transition-colors"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Contractor</span>
                       <ArrowUpDown className={`h-3 w-3 ${sortField === 'contractor' ? 'text-indigo-600' : 'text-slate-400'}`} />
                     </div>
-                  </TableHead>
+                  </th>
 
-                  <TableHead
+                  <th
                     onClick={() => handleSort('block')}
-                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-semibold text-slate-700 py-3 px-4 min-w-[180px] max-w-[240px] align-middle"
+                    className="cursor-pointer hover:text-slate-900 select-none text-xs font-bold text-slate-700 py-3.5 px-4 min-w-[180px] max-w-[240px] align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl backdrop-blur-xs shadow-2xs transition-colors"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Block</span>
                       <ArrowUpDown className={`h-3 w-3 ${sortField === 'block' ? 'text-indigo-600' : 'text-slate-400'}`} />
                     </div>
-                  </TableHead>
+                  </th>
 
-                  <TableHead className="text-right text-xs font-semibold text-slate-700 py-3 px-4 w-[90px] align-middle">
+                  <th className="text-right text-xs font-bold text-slate-700 py-3.5 px-4 w-[90px] align-middle bg-slate-200/95 border-y border-slate-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl backdrop-blur-xs shadow-2xs">
                     Action
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
                 {filteredProjects.map((p) => {
                   const colors = getStatusColor(p.status);
                   const isStatusRTL = isArabicOrRtl(p.status);
                   const progress = p.progress_percent ?? 0;
 
                   return (
-                    <TableRow
+                    <tr
                       key={p.id}
                       onClick={() => onSelectProject(p)}
-                      className="cursor-pointer odd:bg-white even:bg-slate-50/70 hover:bg-indigo-50/60 transition-colors border-b border-slate-100 group"
+                      className="cursor-pointer group transition-all"
                     >
                       {/* Job ID */}
-                      <TableCell className="font-mono text-xs font-bold text-indigo-700 py-3 px-4 whitespace-nowrap align-middle">
+                      <td className="font-mono text-xs font-bold text-indigo-700 py-4 px-4 whitespace-nowrap align-middle bg-slate-50/95 group-hover:bg-indigo-50/40 border-y border-slate-200/90 group-hover:border-indigo-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs group-hover:shadow-xs transition-all">
                         <div className="flex items-center gap-1.5">
                           <Hash className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                           <span>{p.job_id}</span>
                         </div>
-                      </TableCell>
+                      </td>
 
                       {/* Job Type */}
-                      <TableCell className="text-xs text-slate-700 font-medium py-3 px-4 whitespace-nowrap align-middle">
+                      <td className="text-xs text-slate-700 font-medium py-4 px-4 whitespace-nowrap align-middle bg-slate-50/95 group-hover:bg-indigo-50/40 border-y border-slate-200/90 group-hover:border-indigo-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs group-hover:shadow-xs transition-all">
                         {p.job_type || '-'}
-                      </TableCell>
+                      </td>
 
                       {/* Status */}
-                      <TableCell className="py-3 px-4 whitespace-nowrap align-middle">
+                      <td className="py-4 px-4 whitespace-nowrap align-middle bg-slate-50/95 group-hover:bg-indigo-50/40 border-y border-slate-200/90 group-hover:border-indigo-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs group-hover:shadow-xs transition-all">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${colors.bg} ${colors.text} ${colors.border} shadow-2xs`}
                           dir={isStatusRTL ? 'rtl' : 'ltr'}
@@ -294,15 +302,15 @@ export function ProjectsModal({
                           <span className={`h-1.5 w-1.5 rounded-full ${colors.dot}`} />
                           {p.status}
                         </span>
-                      </TableCell>
+                      </td>
 
                       {/* Progress */}
-                      <TableCell className="py-3 px-4 whitespace-nowrap align-middle">
+                      <td className="py-4 px-4 whitespace-nowrap align-middle bg-slate-50/95 group-hover:bg-indigo-50/40 border-y border-slate-200/90 group-hover:border-indigo-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs group-hover:shadow-xs transition-all">
                         <div className="w-24">
                           <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1">
                             <span>{progress}%</span>
                           </div>
-                          <div className="w-full bg-slate-200/70 rounded-full h-1.5 overflow-hidden">
+                          <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
                             <div
                               className={`h-1.5 rounded-full transition-all duration-300 ${
                                 progress >= 100
@@ -315,23 +323,23 @@ export function ProjectsModal({
                             />
                           </div>
                         </div>
-                      </TableCell>
+                      </td>
 
                       {/* Contractor: Wide, full wrapping text without truncation */}
-                      <TableCell className="py-3 px-4 min-w-[260px] max-w-[380px] align-middle">
+                      <td className="py-4 px-4 min-w-[260px] max-w-[380px] align-middle bg-slate-50/95 group-hover:bg-indigo-50/40 border-y border-slate-200/90 group-hover:border-indigo-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs group-hover:shadow-xs transition-all">
                         <div className="flex items-start gap-1.5">
                           <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
                           <span className="text-xs font-medium text-slate-800 break-words leading-relaxed whitespace-normal">
                             {p.contractor || '-'}
                           </span>
                         </div>
-                      </TableCell>
+                      </td>
 
                       {/* Block: Pill badge with location pin icon */}
-                      <TableCell className="py-3 px-4 min-w-[180px] max-w-[240px] align-middle">
+                      <td className="py-4 px-4 min-w-[180px] max-w-[240px] align-middle bg-slate-50/95 group-hover:bg-indigo-50/40 border-y border-slate-200/90 group-hover:border-indigo-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs group-hover:shadow-xs transition-all">
                         {p.block ? (
                           <span
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100/90 text-slate-700 border border-slate-200/80 shadow-2xs max-w-full"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white text-slate-700 border border-slate-200/90 shadow-2xs max-w-full"
                             title={p.block}
                           >
                             <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
@@ -340,26 +348,26 @@ export function ProjectsModal({
                         ) : (
                           <span className="text-xs text-slate-400 font-normal">-</span>
                         )}
-                      </TableCell>
+                      </td>
 
                       {/* Action */}
-                      <TableCell className="text-right py-3 px-4 whitespace-nowrap align-middle">
+                      <td className="text-right py-4 px-4 whitespace-nowrap align-middle bg-slate-50/95 group-hover:bg-indigo-50/40 border-y border-slate-200/90 group-hover:border-indigo-300/90 first:border-l first:rounded-l-xl last:border-r last:rounded-r-xl shadow-2xs group-hover:shadow-xs transition-all">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             onSelectProject(p);
                           }}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg border border-indigo-100 transition-colors cursor-pointer group-hover:bg-indigo-100/90"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-white hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg border border-slate-200/90 group-hover:border-indigo-200 shadow-2xs transition-colors cursor-pointer"
                         >
                           <span>Edit</span>
                           <ChevronRight className="h-3.5 w-3.5" />
                         </button>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   );
                 })}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           )}
         </div>
 

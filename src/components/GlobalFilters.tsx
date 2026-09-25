@@ -38,7 +38,7 @@ export function GlobalFilters({
           <Input
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search by Supervisor, Job ID, Substation, or PO Number..."
+            placeholder="Search by Job ID, PO Number, Supervisor, Status, or Substation..."
             className="pl-10 pr-9 py-2 h-10 rounded-lg border-slate-200 text-sm focus-visible:ring-indigo-500 w-full"
           />
           {searchQuery && (

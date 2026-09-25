@@ -94,18 +94,41 @@ apiRouter.get('/statuses', async (req: Request, res: Response) => {
 /**
  * GET /api/dashboard/summary
  * Returns aggregated { supervisor, status, count }[] computed live from Turso DB.
- * Also returns overall metric highlights.
+ * Also returns overall metric highlights and projectsIndex for fast multi-field search.
  */
 apiRouter.get('/dashboard/summary', async (req: Request, res: Response) => {
   try {
+    const searchParam = req.query.search;
+    const whereConditions: any[] = [];
+
+    if (searchParam && typeof searchParam === 'string' && searchParam.trim()) {
+      const q = `%${searchParam.trim()}%`;
+      whereConditions.push(
+        or(
+          like(projects.job_id, q),
+          like(projects.po_number, q),
+          like(projects.supervisor, q),
+          like(projects.status, q),
+          like(projects.substation_name, q)
+        )
+      );
+    }
+
     // 1. Grouped counts: supervisor x status
-    const groupResults = await db
+    let groupQuery = db
       .select({
         supervisor: projects.supervisor,
         status: projects.status,
         count: sql<number>`count(*)`,
       })
-      .from(projects)
+      .from(projects);
+
+    if (whereConditions.length > 0) {
+      // @ts-ignore
+      groupQuery = groupQuery.where(and(...whereConditions));
+    }
+
+    const groupResults = await groupQuery
       .groupBy(projects.supervisor, projects.status)
       .orderBy(projects.supervisor, desc(sql`count(*)`));
 
@@ -129,6 +152,18 @@ apiRouter.get('/dashboard/summary', async (req: Request, res: Response) => {
       totalCostReplanned: 0,
       totalCostExecuted: 0,
     };
+
+    // 3. Lightweight project search index (for instant 0ms client-side search across all fields)
+    const projectsIndex = await db
+      .select({
+        id: projects.id,
+        job_id: projects.job_id,
+        po_number: projects.po_number,
+        supervisor: projects.supervisor,
+        status: projects.status,
+        substation_name: projects.substation_name,
+      })
+      .from(projects);
 
     // Transform into supervisor card groups:
     // supervisor -> { supervisor, total, statuses: [{ status, count }] }
@@ -174,6 +209,7 @@ apiRouter.get('/dashboard/summary', async (req: Request, res: Response) => {
         totalCostExecuted: Number(stats.totalCostExecuted || 0),
       },
       supervisors,
+      projectsIndex,
       rawGroups: groupResults.map((r) => ({
         supervisor: r.supervisor,
         status: r.status,
@@ -209,9 +245,10 @@ apiRouter.get('/projects', async (req: Request, res: Response) => {
       conditions.push(
         or(
           like(projects.job_id, q),
-          like(projects.substation_name, q),
           like(projects.po_number, q),
           like(projects.supervisor, q),
+          like(projects.status, q),
+          like(projects.substation_name, q),
           like(projects.contractor, q)
         )
       );

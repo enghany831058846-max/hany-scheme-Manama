@@ -30,8 +30,18 @@ import { getStatusColor, isArabicOrRtl } from './lib/utils.ts';
 import type { Project } from './db/schema.ts';
 import type { ImportResult } from './lib/excelMapping.ts';
 
+export interface ProjectSearchItem {
+  id: number;
+  job_id: string;
+  po_number: string | null;
+  supervisor: string;
+  status: string;
+  substation_name: string | null;
+}
+
 export default function App() {
   const [supervisors, setSupervisors] = useState<SupervisorData[]>([]);
+  const [projectIndex, setProjectIndex] = useState<ProjectSearchItem[]>([]);
   const [stats, setStats] = useState({
     totalProjects: 0,
     totalSupervisors: 0,
@@ -94,6 +104,7 @@ export default function App() {
       }
 
       setSupervisors(data.supervisors || []);
+      setProjectIndex(data.projectsIndex || []);
       setStats(
         data.stats || {
           totalProjects: 0,
@@ -136,28 +147,112 @@ export default function App() {
   }, [supervisors]);
 
   // Compute filtered supervisors based on Global Search & Global Status Filter
+  // Matches (case-insensitive, partial match) against:
+  // job_id, po_number, supervisor, status, substation_name (OR logic)
   const filteredSupervisors = useMemo(() => {
+    const trimmedQuery = searchQuery.trim();
+    const hasSearch = Boolean(trimmedQuery);
+    const hasStatusFilter = Boolean(globalStatusFilter);
+
+    // If no search and no status filter, return the default supervisor groups
+    if (!hasSearch && !hasStatusFilter) {
+      return supervisors;
+    }
+
+    const q = trimmedQuery.toLowerCase();
+
+    // Pre-calculate full supervisor totals for comparison (e.g. "1 matching of 98 total")
+    const fullSupervisorTotals = new Map<string, number>();
+    for (const sup of supervisors) {
+      fullSupervisorTotals.set(sup.supervisor, sup.total);
+    }
+
+    // Granular multi-field matching using projectIndex
+    if (projectIndex.length > 0) {
+      // 1. Filter projectIndex across ALL requested fields:
+      // job_id, po_number, supervisor, status, substation_name (OR logic)
+      const matchingProjects = projectIndex.filter((p) => {
+        // Global status filter pill (exact match if active)
+        if (hasStatusFilter && p.status !== globalStatusFilter) {
+          return false;
+        }
+
+        if (hasSearch) {
+          const matchJobId = p.job_id ? p.job_id.toLowerCase().includes(q) : false;
+          const matchPo = p.po_number ? p.po_number.toLowerCase().includes(q) : false;
+          const matchSupervisor = p.supervisor ? p.supervisor.toLowerCase().includes(q) : false;
+          const matchStatus = p.status ? p.status.toLowerCase().includes(q) : false;
+          const matchSubstation = p.substation_name ? p.substation_name.toLowerCase().includes(q) : false;
+
+          return Boolean(matchJobId || matchPo || matchSupervisor || matchStatus || matchSubstation);
+        }
+
+        return true;
+      });
+
+      // If nothing matched, return empty array so "No Supervisors Matched" is shown
+      if (matchingProjects.length === 0) {
+        return [];
+      }
+
+      // 2. Group matching projects by supervisor -> status -> count
+      const supervisorMap = new Map<
+        string,
+        {
+          supervisor: string;
+          total: number;
+          totalAllStatuses?: number;
+          statuses: Map<string, number>;
+        }
+      >();
+
+      for (const p of matchingProjects) {
+        const sup = p.supervisor || 'Unassigned';
+        const st = p.status || 'Unassigned';
+
+        if (!supervisorMap.has(sup)) {
+          supervisorMap.set(sup, {
+            supervisor: sup,
+            total: 0,
+            totalAllStatuses: fullSupervisorTotals.get(sup) ?? 0,
+            statuses: new Map<string, number>(),
+          });
+        }
+
+        const entry = supervisorMap.get(sup)!;
+        entry.total += 1;
+        entry.statuses.set(st, (entry.statuses.get(st) || 0) + 1);
+      }
+
+      const result = Array.from(supervisorMap.values()).map((sup) => ({
+        supervisor: sup.supervisor,
+        total: sup.total,
+        totalAllStatuses: sup.totalAllStatuses,
+        statuses: Array.from(sup.statuses.entries())
+          .map(([status, count]) => ({ status, count }))
+          .sort((a, b) => b.count - a.count),
+      }));
+
+      // Sort supervisor cards descending by matching total projects
+      return result.sort((a, b) => b.total - a.total);
+    }
+
+    // Fallback if projectIndex is loading
     return supervisors
       .filter((sup) => {
-        // Search query filter (matches supervisor name or any of their project statuses)
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase().trim();
+        if (hasSearch) {
           const matchSup = sup.supervisor.toLowerCase().includes(q);
           const matchStatus = sup.statuses.some((s) => s.status.toLowerCase().includes(q));
           if (!matchSup && !matchStatus) return false;
         }
-
-        // Global status filter
-        if (globalStatusFilter) {
+        if (hasStatusFilter) {
           const hasStatus = sup.statuses.some((s) => s.status === globalStatusFilter);
           if (!hasStatus) return false;
         }
-
         return true;
       })
       .map((sup) => {
-        // If a status filter is applied, only show that status in the breakdown
-        if (globalStatusFilter) {
+        if (hasStatusFilter) {
           const filteredStatuses = sup.statuses.filter((s) => s.status === globalStatusFilter);
           const totalForStatus = filteredStatuses.reduce((acc, curr) => acc + curr.count, 0);
           return {
@@ -169,7 +264,7 @@ export default function App() {
         }
         return sup;
       });
-  }, [supervisors, searchQuery, globalStatusFilter]);
+  }, [supervisors, projectIndex, searchQuery, globalStatusFilter]);
 
   // When clicking a status row or supervisor card:
   // Opens the project modal for that supervisor + status combination.
@@ -469,6 +564,7 @@ export default function App() {
         projects={modalProjects}
         isLoading={isModalProjectsLoading}
         onSelectProject={handleOpenProjectDetail}
+        initialFilter={searchQuery}
       />
 
       {/* Project Detail & Inline Edit Modal */}
